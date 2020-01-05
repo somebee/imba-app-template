@@ -1,0 +1,7 @@
+{
+    "folders": [{
+        "path": ".",
+        "folder_exclude_patterns": [".imba",".vscode"],
+        "file_exclude_patterns": ["*.ts","*.ts.map",".editorconfig"]
+    }]
+}

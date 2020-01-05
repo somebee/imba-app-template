@@ -1,0 +1,18 @@
+{
+	"scripts": {
+		"run": "imba main.imba",
+		"run-node": "node dist/main.js",
+		"build": "rollup -c",
+		"watch": "rollup -c --watch",
+		"lsp": "./lsp.sh"
+	},
+	"dependencies": {
+		"imba": "^2.0.0-alpha.13",
+		"rollup": "^1.27.13",
+		"rollup-plugin-commonjs": "^10.1.0",
+		"rollup-plugin-node-resolve": "^5.2.0",
+		"rollup-plugin-replace": "^2.2.0",
+		"rollup-plugin-terser": "^5.1.3",
+		"tippy.js": "^5.1.2"
+	}
+}
