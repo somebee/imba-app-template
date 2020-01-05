@@ -4,7 +4,7 @@
     "files.exclude": {
         "**/*.d.ts": true,
         "*.sublime-project": true,
-        "*.sublime-session": true,
+        "*.sublime-workspace": true,
         "**/*.map": true,
         "src/**/*.js": true,
         ".imba": true,
