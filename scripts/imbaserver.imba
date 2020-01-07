@@ -2,6 +2,7 @@ var fs = require 'fs'
 var ts = require 'typescript'
 
 var imbac = require('imba/dist/compiler.js')
+var sm = require("source-map")
 
 var imbaOptions = {
 	target: 'node'
@@ -11,25 +12,83 @@ var imbaOptions = {
 
 const dir = '/Users/sindre/repos/hello-imba/src'
 
+const js2imba = {}
+const imbaFiles = {}
+
 class ImbaFile
-	def constructor o
-		@jsPath = o
+	def constructor o, services
+		@services = services
+		@jsPath = o.replace(/\.imba$/,'.js')
 		@imbaPath = o.replace(/\.js$/,'.imba')
+		@version = 1
+
+	def compile
+		var body = ts.sys.readFile(@imbaPath)
+		var res = imbac.compile(body,imbaOptions)
+		@result = res
+		@sourcemap = sm.SourceMapConsumer.new(res.sourcemap)
+		console.log 'locmap',res.locmap
+		@locmap = res.locmap
+		@js = res.js
+
+	def originalLocFor loc
+		for [jloc,iloc],i in @locmap
+			if jloc > loc
+				let pos = @locmap[i - 1]
+				return pos and pos[1]
+		return null
+
+	def generatedLocFor loc
+		self
+
+	def originalPositionFor pos
+		console.log 'get original position',pos
+		self
+
+	def generatedPositionFor pos
+		self
+
+	def originalSpanFor span
+		let start = @originalLocFor(span.start)
+		let end = @originalLocFor(span.start + span.length)
+		return {
+			start: start
+			length: end - start
+		}
+
+	def originalDocumentSpanFor docspan
+		self
+
+	def convert item
+		if item isa Array
+			@convert(i) for i in item
+			return
+		if item.textSpan
+			item.imbaTextSpan = @originalSpanFor(item.textSpan)
+
+		return item
 
 class ImbaProgram
 
+	def rewriteDefinitions items
+		for item in items
+			let ifile = js2imba[item.fileName]
+			ifile.convert(item) if ifile
+		return items
+
+var program = ImbaProgram.new
 
 def watch(rootFileNames, options)
 	var files = {}
-	var js2imba = {}
-	var imbaFiles = {}
+	
+	var services
 
 	def sourceFileExists(fileName)
 		var alt = fileName.replace(/\.js$/, '.imba')
 
 		if alt != fileName && ts.sys.fileExists(alt)
 			console.log('fileExists!', fileName, alt)
-			js2imba[fileName] = alt
+			js2imba[fileName] ||= ImbaFile.new(alt,services)
 			return true
 
 		return false
@@ -40,10 +99,12 @@ def watch(rootFileNames, options)
 	def readFile(fileName)
 		var source = js2imba[fileName]
 		if source
-			var body = ts.sys.readFile(source)
-			var res = imbac.compile(body,imbaOptions)
-			console.log('read compiled file!', res.js)
-			return res.js
+			source.compile()
+			return source.js
+			# var body = ts.sys.readFile(source)
+			# var res = imbac.compile(body,imbaOptions)
+			# console.log('read compiled file!', res.js)
+			# return res.js
 
 		return ts.sys.readFile(fileName)
 
@@ -70,7 +131,8 @@ def watch(rootFileNames, options)
 	}
 
 	// Create the language service files
-	var services = ts.createLanguageService(servicesHost, ts.createDocumentRegistry())
+	services = ts.createLanguageService(servicesHost, ts.createDocumentRegistry())
+	program.tsls = services
 	// Now let's watch the files
 	for fileName in rootFileNames
 		emitFile(fileName)
@@ -92,13 +154,20 @@ def watch(rootFileNames, options)
 			console.log("Emitting " + fileName + " failed")
 			logErrors(fileName)
 
+		var srcFile = js2imba[fileName]
+
 		if fileName.indexOf('main.js') >= 0
-			console.log('get completion here??')
-			var completion = services.getCompletionsAtPosition(fileName, 34, {})
-			console.log(completion)
+			console.log('get completion here??',!!srcFile)
+			# var completion = services.getCompletionsAtPosition(fileName, 34, {})
+			# console.log(completion)
+
+
 			var definition = services.getDefinitionAtPosition(fileName, 34)
-			console.log(definition);
-			console.log(services.getDefinitionAtPosition(fileName, 47))
+			program.rewriteDefinitions(definition)
+			console.log(definition)
+			definition = services.getDefinitionAtPosition(fileName, 47)
+			program.rewriteDefinitions(definition)
+			console.log(definition)
 
 
 	def logErrors(fileName)
