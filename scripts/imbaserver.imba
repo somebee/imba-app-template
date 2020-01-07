@@ -27,7 +27,7 @@ class ImbaFile
 		var res = imbac.compile(body,imbaOptions)
 		@result = res
 		@sourcemap = sm.SourceMapConsumer.new(res.sourcemap)
-		console.log 'locmap',res.locmap
+		# console.log 'locmap',res.locmap
 		@locmap = res.locmap
 		@js = res.js
 
@@ -49,6 +49,7 @@ class ImbaFile
 		self
 
 	def originalSpanFor span
+		return unless span
 		let start = @originalLocFor(span.start)
 		let end = @originalLocFor(span.start + span.length)
 		return {
@@ -56,24 +57,28 @@ class ImbaFile
 			length: end - start
 		}
 
-	def originalDocumentSpanFor docspan
-		self
+	def originalDocumentSpanFor orig
+		let res = {
+			fileName: @imbaPath
+			textSpan: @originalSpanFor(orig.textSpan)
+			contextSpan: @originalSpanFor(orig.contextSpan)
+		}
+		console.log('converted',orig,res,@locmap)
+		orig.converted = res
+		orig.locmap = @locmap
 
-	def convert item
-		if item isa Array
-			@convert(i) for i in item
-			return
-		if item.textSpan
-			item.imbaTextSpan = @originalSpanFor(item.textSpan)
-
-		return item
+		if false
+			orig.fileName = @imbaPath
+			orig.textSpan && (orig.textSpan = @originalSpanFor(orig.textSpan))
+			orig.contextSpan && (orig.contextSpan = @originalSpanFor(orig.contextSpan))
+		return orig
 
 class ImbaProgram
 
 	def rewriteDefinitions items
 		for item in items
 			let ifile = js2imba[item.fileName]
-			ifile.convert(item) if ifile
+			ifile.originalDocumentSpanFor(item) if ifile
 		return items
 
 var program = ImbaProgram.new
@@ -87,7 +92,7 @@ def watch(rootFileNames, options)
 		var alt = fileName.replace(/\.js$/, '.imba')
 
 		if alt != fileName && ts.sys.fileExists(alt)
-			console.log('fileExists!', fileName, alt)
+			# console.log('fileExists!', fileName, alt)
 			js2imba[fileName] ||= ImbaFile.new(alt,services)
 			return true
 
@@ -164,10 +169,10 @@ def watch(rootFileNames, options)
 
 			var definition = services.getDefinitionAtPosition(fileName, 34)
 			program.rewriteDefinitions(definition)
-			console.log(definition)
+			# console.log(definition)
 			definition = services.getDefinitionAtPosition(fileName, 47)
 			program.rewriteDefinitions(definition)
-			console.log(definition)
+			# console.log(definition)
 
 
 	def logErrors(fileName)
